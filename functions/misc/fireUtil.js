@@ -1,3 +1,6 @@
+const { K8S } = require('./k8s');
+
+
 function GetOne(snap) {
     console.log(snap.size)
     if (snap.size != 1) {
@@ -19,7 +22,7 @@ function GetMulti(snap) {
     return res
 }
 
-function Getuid(data, context) {
+function GetUid(data, context) {
     var uid = null
     if (process.env.DEV_FIREBASE) {
         uid = data.uid
@@ -29,9 +32,20 @@ function Getuid(data, context) {
     return uid
 }
 
+async function GetClusterByUid(uid, db) {
+    const settings = db.collection('settings');
+    snap = await settings.where('owner_uid', '==', uid).get()
+    var s = GetOne(snap)
+    var k8 = new K8S(s.cluster)
+
+    await k8.init()
+
+    return k8
+}
 
 module.exports = {
     GetOne,
     GetMulti,
-    Getuid,
+    GetUid,
+    GetClusterByUid
 }

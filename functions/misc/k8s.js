@@ -18,7 +18,7 @@ class K8S {
 
     }
     async init() {
-       return await this.client.loadSpec()
+        return await this.client.loadSpec()
     }
 
 
@@ -152,6 +152,25 @@ class K8S {
     async listSecret() {
         return await this.client.api.v1.namespaces('default').secrets.get()
     }
+
+    async postSecret(secret) {
+        try {
+            await this.client.api.v1.namespaces('default').secrets.post({ body: secret })
+        } catch (err) {
+            if (err.code !== 409) throw err
+            return await this.client.api.v1.namespaces('default').secrets(secret.metadata.name).put({ body: secret })
+        }
+    }
+
+    async deleteSecret(secret) {
+        try {
+            return await this.client.api.v1.namespaces('default').secrets(secret.metadata.name).delete()
+        } catch (err) {
+            if (err.code !== 404) throw err
+            return
+        }
+    }
+
 }
 
 

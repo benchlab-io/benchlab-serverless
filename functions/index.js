@@ -2,7 +2,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { K8S } = require('./misc/k8s');
 const { GCP } = require('./misc/gcp');
-const { GetOne, GetMulti, Getuid } = require('./misc/fireUtil');
+const { GetOne, GetMulti, GetUid, GetClusterByUid } = require('./misc/fireUtil');
 
 
 
@@ -105,8 +105,8 @@ exports.jobV1 = functions.https.onRequest(async (request, response) => {
 
 exports.initV1 = functions.https.onCall(async (data, context) => {
     var uid = null
-    if(process.env.DEV_FIREBASE){
-        uid =  data.uid
+    if (process.env.DEV_FIREBASE) {
+        uid = data.uid
     } else {
         uid = context.auth.uid;
     }
@@ -128,35 +128,28 @@ exports.initV1 = functions.https.onCall(async (data, context) => {
 });
 
 exports.ingressV1 = functions.https.onCall(async (data, context) => {
-    var uid = Getuid(data,context)
+    var uid = GetUid(data, context)
     const projects = db.collection('projects');
     var snap = await projects.where('owner_uid', '==', uid).get()
-    var p = GetMulti(snap).filter((i)=> i.hostname)
-    const settings = db.collection('settings');
-    snap = await settings.where('owner_uid', '==', uid).get()
-    var s = GetOne(snap)
-    s.SA = JSON.parse(s.SA)
-    var k8 = new K8S(s.cluster)
-    await k8.init()
-    k8.ingress(p.map(i => {return {host: i.hostname , service: i.name.split('/')[1] }}))
+    var p = GetMulti(snap).filter((i) => i.hostname)
+    var k8 = await GetClusterByUid(uid, db)
+
+    k8.ingress(p.map(i => { return { host: i.hostname, service: i.name.split('/')[1] } }))
     return
 });
 
 
-exports.podInfoV1 =  functions.https.onCall(async (data, context) => {
-    var uid = Getuid(data,context)
+exports.podInfoV1 = functions.https.onCall(async (data, context) => {
+    var uid = GetUid(data, context)
     const projects = db.collection('projects');
     var snap = await projects.doc(data.project).get()
     var p = snap.data()
-    const settings = db.collection('settings');
-    snap = await settings.where('owner_uid', '==', uid).get()
-    var s = GetOne(snap)
-    var k8 = new K8S(s.cluster)
-    await k8.init()
+    var k8 = await GetClusterByUid(uid, db)
+
     return await k8.getStatus(p.name)
 })
-exports.monitoringV1 =  functions.https.onCall(async (data, context) => {
-    var uid = Getuid(data,context)
+exports.monitoringV1 = functions.https.onCall(async (data, context) => {
+    var uid = GetUid(data, context)
     const projects = db.collection('projects');
     var snap = await projects.doc(data.project).get()
     var p = snap.data()
@@ -164,28 +157,54 @@ exports.monitoringV1 =  functions.https.onCall(async (data, context) => {
     snap = await settings.where('owner_uid', '==', uid).get()
     var s = GetOne(snap)
     var cloud = new GCP(JSON.parse(s.SA))
-    var res =  await cloud.GetMetrics()
+    var res = await cloud.GetMetrics()
     return res.body
 
 })
 
 exports.secretListV1 = functions.https.onCall(async (data, context) => {
-    var uid = Getuid(data,context)
-    const settings = db.collection('settings');
-    snap = await settings.where('owner_uid', '==', uid).get()
-    var s = GetOne(snap)
-    var k8 = new K8S(s.cluster)
+    var uid = GetUid(data, context)
+    var k8 = await GetClusterByUid(uid, db)
+    var res = await k8.listSecret()
 
-    await k8.init()
-    return await k8.listSecret()
+    return res.body.items.map((item) => {
+        return ({ "name": item.metadata.name, "data": item.data })
+    })
+
 })
-exports.secretListV1 = functions.https.onCall(async (data, context) => {
-    var uid = Getuid(data,context)
-    const settings = db.collection('settings');
-    snap = await settings.where('owner_uid', '==', uid).get()
-    var s = GetOne(snap)
-    var k8 = new K8S(s.cluster)
-    
-    await k8.init()
-    return await k8.listSecret()
+
+exports.secretPostV1 = functions.https.onCall(async (data, context) => {
+    var uid = GetUid(data, context)
+    var k8 = await GetClusterByUid(uid, db)
+
+    for (key in data.data) {
+        data.data[key] = Buffer.from(data.data[key]).toString("base64");
+
+    }
+
+    return await k8.postSecret({
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": { "name": data.name },
+        "data": data.data
+    })
+
 })
+
+
+exports.secretDeleteV1 = functions.https.onCall(async (data, context) => {
+    var uid = GetUid(data, context)
+    var k8 = await GetClusterByUid(uid, db)
+
+    return await k8.deleteSecret({
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": { "name": data.name },
+    })
+
+})
+
+
+// secretDeleteV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3", "name": "toto"})
+// secretPostV1({"uid":"FioUFd4PeKUNHvK3hJatS2QhkkJ3", "name":"toto", "data": {"username":"to", "password":"ta"}})
+// secretListV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3" })
