@@ -18,12 +18,12 @@ class K8S {
 
     }
     async init() {
-        await this.client.loadSpec()
+       return await this.client.loadSpec()
     }
 
 
     async deploy(gcpProject, repo, pipelineId) {
-       var repoFormat = repo.split('/')[1];
+        var repoFormat = repo.split('/')[1];
         var deployment = {
             "kind": "Deployment",
             "spec": {
@@ -101,11 +101,11 @@ class K8S {
         } catch (err) {
             if (err.code !== 409) throw err
         }
-        
 
-        
+
+
     }
-    async ingress(routing){
+    async ingress(routing) {
         var ingress = {
             "apiVersion": "extensions/v1beta1",
             "kind": "Ingress",
@@ -116,12 +116,12 @@ class K8S {
                 }
             },
             "spec": {
-                "rules":routing.map((r)=>{
-                    return  {
+                "rules": routing.map((r) => {
+                    return {
                         "host": r.host,
                         "http": {
                             "paths": [
-                              
+
                                 {
                                     "backend": {
                                         "serviceName": r.service,
@@ -134,16 +134,23 @@ class K8S {
                 })
             }
         }
-    
-    
-    
+
+
+
         try {
-            await this.client.apis.extensions.v1beta1.namespaces('default').ingresses.post({body:ingress})
+            await this.client.apis.extensions.v1beta1.namespaces('default').ingresses.post({ body: ingress })
         } catch (err) {
             if (err.code !== 409) throw err
-            await this.client.apis.extensions.v1beta1.namespaces('default').ingresses('benchlab-ingress').put({body:ingress})
+            await this.client.apis.extensions.v1beta1.namespaces('default').ingresses('benchlab-ingress').put({ body: ingress })
         }
-    
+
+    }
+    async getStatus(repo) {
+        var repoFormat = repo.split('/')[1];
+        return await this.client.apis.apps.v1beta1.namespaces('default').deployments(repoFormat).status.get()
+    }
+    async listSecret() {
+        return await this.client.api.v1.namespaces('default').secrets.get()
     }
 }
 

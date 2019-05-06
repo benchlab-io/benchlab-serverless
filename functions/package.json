@@ -12,6 +12,7 @@
     "crypto": "^1.0.1",
     "firebase-admin": "~7.0.0",
     "firebase-functions": "^2.2.0",
+    "gtoken": "^2.3.3",
     "kubernetes-client": "^7.0.0",
     "superagent": "^5.0.5"
   },

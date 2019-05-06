@@ -1,3 +1,6 @@
+
+const { GoogleToken } = require('gtoken');
+const superagent = require('superagent')
 class GCP {
     constructor(SA) {
         this.project = SA.project_id;
@@ -73,13 +76,29 @@ class GCP {
 
                 "parent": `/projects/${this.project}/zones/us-east1-c`,
             })
-        await this.WaitOperation(result.body.selfLink, token)
+        await this.WaitOperation(result.body.selfLink, this.token)
         var result = await superagent.get(`https://container.googleapis.com/v1/projects/${this.project}/zones/us-east1-c/clusters`)
             .set("Authorization", "Bearer " + token)
         var cluster = result.body.clusters.find((i) => {
             return i.name == clusterName
         })
         return { target: cluster.endpoint, username, password, clusterName }
+    }
+
+    async GetMetrics() {
+
+        var token = await this.gtoken.getToken();
+        var url = `https://content-monitoring.googleapis.com/v3/projects/${this.project}/timeSeries`
+        return superagent.get(url)
+            .set("Authorization", "Bearer " + token)
+            .query({
+                'aggregation.perSeriesAligner': 'ALIGN_NONE',
+                'interval.startTime': '2019-05-04T02:40:34.279Z',
+                'interval.endTime': '2019-05-04T10:51:34.279Z',
+                'aggregation.crossSeriesReducer': 'REDUCE_NONE',
+                'filter': `metric.type = "container.googleapis.com/container/cpu/utilization" AND resource.labels.container_name="test-cocd" `
+            })
+            
     }
 }
 

@@ -1,4 +1,5 @@
 function GetOne(snap) {
+    console.log(snap.size)
     if (snap.size != 1) {
         return null
     }
@@ -10,7 +11,7 @@ function GetOne(snap) {
 }
 
 function GetMulti(snap) {
- 
+
     var res = []
     snap.forEach((doc) => {
         res.push({ ...doc.data(), id: doc.id })
@@ -18,10 +19,19 @@ function GetMulti(snap) {
     return res
 }
 
-
+function Getuid(data, context) {
+    var uid = null
+    if (process.env.DEV_FIREBASE) {
+        uid = data.uid
+    } else {
+        uid = context.auth.uid;
+    }
+    return uid
+}
 
 
 module.exports = {
     GetOne,
-    GetMulti
+    GetMulti,
+    Getuid,
 }

@@ -2,7 +2,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { K8S } = require('./misc/k8s');
 const { GCP } = require('./misc/gcp');
-const { GetOne, GetMulti } = require('./misc/fireUtil')
+const { GetOne, GetMulti, Getuid } = require('./misc/fireUtil');
 
 
 
@@ -128,12 +128,7 @@ exports.initV1 = functions.https.onCall(async (data, context) => {
 });
 
 exports.ingressV1 = functions.https.onCall(async (data, context) => {
-    var uid = null
-    if(process.env.DEV_FIREBASE){
-        uid =  data.uid
-    } else {
-        uid = context.auth.uid;
-    }
+    var uid = Getuid(data,context)
     const projects = db.collection('projects');
     var snap = await projects.where('owner_uid', '==', uid).get()
     var p = GetMulti(snap).filter((i)=> i.hostname)
@@ -145,6 +140,52 @@ exports.ingressV1 = functions.https.onCall(async (data, context) => {
     await k8.init()
     k8.ingress(p.map(i => {return {host: i.hostname , service: i.name.split('/')[1] }}))
     return
-    
-
 });
+
+
+exports.podInfoV1 =  functions.https.onCall(async (data, context) => {
+    var uid = Getuid(data,context)
+    const projects = db.collection('projects');
+    var snap = await projects.doc(data.project).get()
+    var p = snap.data()
+    const settings = db.collection('settings');
+    snap = await settings.where('owner_uid', '==', uid).get()
+    var s = GetOne(snap)
+    var k8 = new K8S(s.cluster)
+    await k8.init()
+    return await k8.getStatus(p.name)
+})
+exports.monitoringV1 =  functions.https.onCall(async (data, context) => {
+    var uid = Getuid(data,context)
+    const projects = db.collection('projects');
+    var snap = await projects.doc(data.project).get()
+    var p = snap.data()
+    const settings = db.collection('settings');
+    snap = await settings.where('owner_uid', '==', uid).get()
+    var s = GetOne(snap)
+    var cloud = new GCP(JSON.parse(s.SA))
+    var res =  await cloud.GetMetrics()
+    return res.body
+
+})
+
+exports.secretListV1 = functions.https.onCall(async (data, context) => {
+    var uid = Getuid(data,context)
+    const settings = db.collection('settings');
+    snap = await settings.where('owner_uid', '==', uid).get()
+    var s = GetOne(snap)
+    var k8 = new K8S(s.cluster)
+
+    await k8.init()
+    return await k8.listSecret()
+})
+exports.secretListV1 = functions.https.onCall(async (data, context) => {
+    var uid = Getuid(data,context)
+    const settings = db.collection('settings');
+    snap = await settings.where('owner_uid', '==', uid).get()
+    var s = GetOne(snap)
+    var k8 = new K8S(s.cluster)
+    
+    await k8.init()
+    return await k8.listSecret()
+})
