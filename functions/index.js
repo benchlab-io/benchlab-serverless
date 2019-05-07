@@ -80,7 +80,26 @@ exports.jobV1 = functions.https.onRequest(async (request, response) => {
                     settings.SA = JSON.parse(settings.SA)
                     var k8 = new K8S(settings.cluster)
                     await k8.init()
-                    await k8.deploy(settings.SA.project_id, j.project, jRef.id)
+                    var res = await k8.listSecret()
+
+                    var secrets = res.body.items.map(item => {
+                        var item_name = item.metadata.name
+                        var res = Object.keys(item.data).map(secret_name => {
+                            var tmp = {}
+                            tmp["name"] = (item_name + "_" + secret_name).toUpperCase()
+                            tmp["valueFrom"] = { "secretKeyRef": { "name": item_name, "key": secret_name } }
+                            return tmp
+                        })
+
+                        return res
+                    })
+
+                    // Flatten
+                    var secrets = [].concat.apply([], secrets)
+                    // Remove Default Tokens
+                    secrets = secrets.filter(secret => { return secret.name.includes("DEFAULT-TOKEN") === false })
+
+                    await k8.deploy(settings.SA.project_id, j.project, jRef.id, secrets)
 
                 }
                 response.send()
@@ -208,3 +227,4 @@ exports.secretDeleteV1 = functions.https.onCall(async (data, context) => {
 // secretDeleteV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3", "name": "toto"})
 // secretPostV1({"uid":"FioUFd4PeKUNHvK3hJatS2QhkkJ3", "name":"toto", "data": {"username":"to", "password":"ta"}})
 // secretListV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3" })
+// curl -d '{"job_id":"2F5CmP7kIBMmDp731Ese", "status":"success"}' -X "PUT" http://localhost:5000/cooperathon/us-central1/jobV1 -H "Content-Type: application/json"

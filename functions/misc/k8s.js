@@ -22,7 +22,7 @@ class K8S {
     }
 
 
-    async deploy(gcpProject, repo, pipelineId) {
+    async deploy(gcpProject, repo, pipelineId, secrets) {
         var repoFormat = repo.split('/')[1];
         var deployment = {
             "kind": "Deployment",
@@ -44,7 +44,8 @@ class K8S {
                                     {
                                         "containerPort": 3001
                                     }
-                                ]
+                                ],
+                                "env": secrets
                             }
                         ]
                     },
