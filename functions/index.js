@@ -123,12 +123,8 @@ exports.jobV1 = functions.https.onRequest(async (request, response) => {
 
 
 exports.initV1 = functions.https.onCall(async (data, context) => {
-    var uid = null
-    if (process.env.DEV_FIREBASE) {
-        uid = data.uid
-    } else {
-        uid = context.auth.uid;
-    }
+    var uid = GetUid(data, context)
+
     var settings = db.collection('settings');
     var snap = await settings.where('owner_uid', '==', uid).get()
     var settings = GetOne(snap)
@@ -145,6 +141,30 @@ exports.initV1 = functions.https.onCall(async (data, context) => {
     }
 
 });
+
+
+exports.logsListV1 = functions.https.onCall(async (data, context) => {
+    var uid = GetUid(data, context)
+    var settings = db.collection('settings');
+    var snap = await settings.where('owner_uid', '==', uid).get()
+    var settings = GetOne(snap)
+    var cloud = new GCP(JSON.parse(settings.SA))
+    try {
+        var logs = await cloud.GetLogs(data.cluster_name,
+            data.namespace_id,
+            data.container_name,
+            data.start_timestamp,
+            data.end_timestamp)
+        console.log("Logs", logs.logs)
+        console.log("Token", logs.nextPageToken)
+        return logs
+    } catch (err) {
+        console.log(err)
+        return
+    }
+
+
+})
 
 exports.ingressV1 = functions.https.onCall(async (data, context) => {
     var uid = GetUid(data, context)
@@ -221,10 +241,13 @@ exports.secretDeleteV1 = functions.https.onCall(async (data, context) => {
         "metadata": { "name": data.name },
     })
 
+
 })
+
 
 
 // secretDeleteV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3", "name": "toto"})
 // secretPostV1({"uid":"FioUFd4PeKUNHvK3hJatS2QhkkJ3", "name":"toto", "data": {"username":"to", "password":"ta"}})
 // secretListV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3" })
-// curl -d '{"job_id":"2F5CmP7kIBMmDp731Ese", "status":"success"}' -X "PUT" http://localhost:5000/cooperathon/us-central1/jobV1 -H "Content-Type: application/json"
+// logsListV1({ "uid": "FioUFd4PeKUNHvK3hJatS2QhkkJ3", cluster_name: "benchlab-ac647b91d416a400c5d5", namespace_id: "default", container_name: "app", start_timestamp: "2019-01-09T15:57:13.407456220Z", end_timestamp: "2019-05-09T15:57:18.881424287Z" })
+// curl -d '{"job_id":"2F5CmP7kIBMmDp731Ese", "status": "success"}' -X "PUT" http://localhost:5000/cooperathon/us-central1/jobV1 -H "Content-Type: application/json"

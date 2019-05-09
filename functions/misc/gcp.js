@@ -98,8 +98,40 @@ class GCP {
                 'aggregation.crossSeriesReducer': 'REDUCE_NONE',
                 'filter': `metric.type = "container.googleapis.com/container/cpu/utilization" AND resource.labels.container_name="test-cocd" `
             })
-            
+
     }
+
+    async GetLogs(cluster_name, namespace_id, container_name, start_timestamp, end_timestamp) {
+
+        var token = await this.gtoken.getToken();
+        var result = await superagent.post("https://logging.googleapis.com/v2/entries:list")
+            .set("Authorization", "Bearer " + token)
+            .send({
+                "filter": `resource.type="container"
+                        AND resource.labels.cluster_name="${cluster_name}"
+                        AND resource.labels.namespace_id="${namespace_id}"
+                        AND resource.labels.container_name="${container_name}"
+                        AND timestamp>="${start_timestamp}"
+                        AND timestamp<="${end_timestamp}"`,
+                "orderBy": "timestamp desc",
+                "pageSize": 100,
+                "resourceNames": [
+                    "projects/nicolas-test-239318"
+                ]
+
+            })
+        var logs = result.body.entries.map((entry) => {
+            return {
+                "textPayload": entry.textPayload,
+                "pod_id": entry.resource.labels.pod_id,
+                "timestamp": entry.timestamp,
+                "severity": entry.severity
+            }
+        })
+        console.log(logs)
+        return { logs, nextPageToken: result.body.nextPageToken }
+    }
+
 }
 
 
